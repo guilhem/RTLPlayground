@@ -904,6 +904,31 @@ bool sfp_print_measurements(uint8_t sfp)
 }
 
 
+/* Runs synchronously in the command handler: idle() cannot replace the results
+ * with an automatic SFP retry between the transfer and the status readout. */
+static void sfp_probe(uint8_t slot)
+{
+	static __code const uint8_t offsets[] = { 11, 12, 11, 20, 20 };
+	static __code const uint8_t lengths[] = { 1, 1, 2, 1, 16 };
+
+	for (uint8_t i = 0; i < sizeof(offsets); i++) {
+		bool ok = sfp_read_block(slot, offsets[i], lengths[i]);
+		print_string("\nSFP probe slot="); itoa(slot + 1);
+		print_string(" offset="); itoa(offsets[i]);
+		print_string(" len="); itoa(lengths[i]);
+		print_string(ok ? " OK" : " ERROR");
+		print_string(" ctrl="); print_reg(RTL837X_REG_I2C_CTRL);
+		print_string(" raw="); print_reg(RTL837X_REG_I2C_OUT);
+		if (ok) {
+			print_string(" bytes=");
+			for (uint8_t j = 0; j < lengths[i]; j++) {
+				print_byte(sfp_buf[j]); write_char(' ');
+			}
+		}
+		write_char('\n');
+	}
+}
+
 void parse_sfp(void)
 {
 	uint8_t slot;
@@ -943,6 +968,10 @@ void parse_sfp(void)
 		return;
 	}
 
+	if (cmd_compare(2, "probe")) {
+		sfp_probe(slot);
+		return;
+	}
 	if (cmd_compare(2, "10g")) {
 		print_string(" 10G\n");
 		sfp_speed[slot] = SFP_SPEED_10G;
@@ -965,7 +994,7 @@ void parse_sfp(void)
 	handle_sfp();
 	return;
 err:
-	print_string("\nUsage:\n\tsfp\n\tsfp [1|2] [1g|2g5|10g]\n");
+	print_string("\nUsage:\n\tsfp\n\tsfp [1|2] [1g|2g5|10g]\n\tsfp [1|2] probe\n");
 }
 
 
