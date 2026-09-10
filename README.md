@@ -56,8 +56,8 @@ device simulator is provided, which runs entirely under Linux as a local webserv
 
 ## Download prebuilt firmware
 
-The **Build firmware** GitHub Actions workflow builds all selectable machine targets
-in `machine.h`. You can download the images without compiling locally:
+The **Build firmware** GitHub Actions workflow builds all supported boards using an
+explicit matrix. You can download the images without compiling locally:
 
 - **Snapshots:** open this repository's **Actions → Build firmware**, select a run
   for the branch and commit you want, and download the artifact for your machine.
@@ -84,11 +84,29 @@ web update support to unmanaged devices. See [Supported devices](doc/supported_d
 and the installation instructions below before flashing. Prebuilt images use the
 repository's default `config.txt`.
 
-When adding a board, add its target to `machine.h` and to
+When adding a board, create `boards/<MACHINE>/board.c` and add the target name to
 `jobs.build.strategy.matrix.machine` in [the build workflow](.github/workflows/build.yml).
-The matrix uses names without the `MACHINE_` prefix. Each target builds in its own
-job; a failed target does not cancel the others. Re-running a workflow replaces its
-same-named artifacts, and re-running the release upload replaces same-named assets.
+Use the directory name as the matrix entry. Add `boards/<MACHINE>/init.c`
+only when the board needs a custom `machine_custom_init(void) __banked` hook; keep
+its `#pragma codeseg BANK2` and `#pragma constseg BANK2` declarations. Without an
+`init.c`, the common root hook remains a no-op. `machine.h` contains the common
+machine types and hook prototype. Each target builds in its own job; a failed target
+does not cancel the others. Re-running a workflow replaces its same-named artifacts,
+and re-running the release upload replaces same-named assets.
+
+Board sources are organized as follows:
+
+```
+boards/<MACHINE>/board.c  target hardware tables and settings
+boards/<MACHINE>/init.c   optional board-specific initialization hook
+boards/common/*.h        shared hardware tables for equivalent targets
+machine.h                common types and hook prototype
+machine_init.c           default no-op initialization hook
+```
+
+`board.c` defines `__code const struct machine machine`. Equivalent targets can
+define `BOARD_NAME` and include one of the shared profiles in `boards/common/`.
+Run `make machine_check` to compile-check every board definition and init hook.
 
 ## (0) Compiling Requirements
 
@@ -139,15 +157,16 @@ docker run --rm -p 8080:8080 -v $(pwd):/workspace rtlplayground-dev \
   tools/output/httpd_sim /workspace/html
 ```
 
-Edit `machine.h` or `config.txt` on your host, then re-run `make` — the
-source directory is mounted into the container, so changes take effect
-immediately. To build for a different machine, pass `MACHINE=...`.
+Edit `config.txt` on your host, then re-run `make MACHINE=...` — the source
+directory is mounted into the container, so changes take effect immediately.
+To build for a different machine, pass its target name in `MACHINE=...`.
 
 </details>
 
 ## (1) Compiling for direct chip flashing AND upgrading an existing RTLPlayground running device
 
-Edit machine.h with an editor like vi or nano. Select the correct machine the firmware should build for.
+List available targets with `make list-machines`, then select the correct board
+with `make MACHINE=...`.
 
 > [!TIP]
 > You can write configuration parameters in config.txt (see below) in order your switch to get
@@ -155,7 +174,7 @@ Edit machine.h with an editor like vi or nano. Select the correct machine the fi
 
 Now, building the firmware image should work:
 ```
-make 
+make MACHINE=DEFAULT_8C_1SFP
 ```
 Note, that the image generated ends in .bin, not .img, in order to make IMSProg happy.
 
