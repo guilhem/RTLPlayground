@@ -54,6 +54,42 @@ devices by looking at the image using e.g. Ghidra. If you want to contribute to 
 design of the web-interface or get a feeling for the interface first, a standalone
 device simulator is provided, which runs entirely under Linux as a local webserver.
 
+## Download prebuilt firmware
+
+The **Build firmware** GitHub Actions workflow builds all selectable machine targets
+in `machine.h`. You can download the images without compiling locally:
+
+- **Snapshots:** open this repository's **Actions → Build firmware**, select a run
+  for the branch and commit you want, and download the artifact for your machine.
+  Every branch push builds a snapshot; **Run workflow** also starts a build manually.
+  Artifact names include the machine and commit SHA. Downloads require a GitHub
+  login and remain available for the repository's configured artifact retention period.
+- **Versions:** open this repository's **Releases** and download your machine's
+  `.bin` files from the release assets. Publishing a release or pre-release with a
+  tag such as `v0.2.0` or `v0.2.0-rc.1` builds that tag and attaches the images once
+  every machine has built successfully. The tag supplies the firmware version;
+  assets appear after the workflow finishes. Releases must allow asset uploads
+  after publication (immutable releases are incompatible with this trigger).
+
+Each snapshot artifact contains two files; versions provide the same files directly
+as release assets:
+
+| File | Use |
+| --- | --- |
+| `rtlplayground-vVERSION-COMMIT-MACHINE.bin` | Direct chip flashing or updating a device already running RTLPlayground. |
+| `rtlplayground-vVERSION-COMMIT-MACHINE-oem-upgrade.bin` | Initial installation through a compatible original OEM firmware's web update interface. |
+
+Select the target for your exact PCB revision; an OEM installer image does not add
+web update support to unmanaged devices. See [Supported devices](doc/supported_devices.md)
+and the installation instructions below before flashing. Prebuilt images use the
+repository's default `config.txt`.
+
+When adding a board, add its target to `machine.h` and to
+`jobs.build.strategy.matrix.machine` in [the build workflow](.github/workflows/build.yml).
+The matrix uses names without the `MACHINE_` prefix. Each target builds in its own
+job; a failed target does not cancel the others. Re-running a workflow replaces its
+same-named artifacts, and re-running the release upload replaces same-named assets.
+
 ## (0) Compiling Requirements
 
 Install the following particular build requisites (Debian 12/13), note that Ubuntu 24.04
