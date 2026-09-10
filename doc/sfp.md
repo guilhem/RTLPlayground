@@ -19,6 +19,20 @@ I2C controller for reading such EEPROMs so that interfacing is very simple.
 
 ## I2C Controller
 
+### Comparing single-byte and block reads
+
+The serial commands `sfp 1 probe` and `sfp 2 probe` perform five EEPROM reads:
+offset 11 length 1, offset 12 length 1, offset 11 length 2, offset 20 length 1,
+and offset 20 length 16. Offsets and lengths are printed in decimal. Each result
+includes `OK` or `ERROR`, the controller status (`ctrl`) and its first data
+register (`raw`), both in hexadecimal. Decoded buffer bytes appear only on success;
+`raw` may contain stale or partial data when a transfer fails.
+
+The command runs synchronously, so automatic SFP retries cannot overwrite a
+transfer's result before it is printed. It uses the existing EEPROM read helper
+and does not change EEPROM contents, the configured port speed or the SerDes
+mode. Normal polling resumes after the command returns.
+
 The I2C controller of the RTL8372/3 is very simple and probably designed specifically
 for reading 24C EEPROMs. Its use is straight-forward: Configure the I2C bus used
 (the code currently uses the default already set regarding what is probably timing)
