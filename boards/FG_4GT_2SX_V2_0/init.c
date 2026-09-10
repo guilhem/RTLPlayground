@@ -1,6 +1,6 @@
 /*
- * Default no-op boot hook for boards without init.c, kept in BANK2
- * like the board-specific hooks.
+ * Per-machine one-shot boot hooks, hosted in BANK2 so board-specific
+ * tables and code do not consume the common bank.
  */
 #include <stdint.h>
 #include "machine.h"
@@ -13,4 +13,7 @@
 #pragma codeseg BANK2
 #pragma constseg BANK2
 
-void machine_custom_init(void) __banked { }
+void machine_custom_init(void) __banked
+{
+	REG_SET(RTL837X_REG_LED_GLB_IO_EN, 0x7624155b);
+}

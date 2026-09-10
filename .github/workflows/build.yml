@@ -22,7 +22,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Keep this list in sync with the selectable targets in machine.h.
+        # Keep this list in sync with boards/*/board.c (make list-machines).
         machine:
           - KP_9000_6XHML_X2
           - KP_9000_6XH_X2

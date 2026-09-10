@@ -14,12 +14,20 @@ AFLAGS= -plosgff
 SUBDIRS := tools
 SUBDIRSCLEAN=$(addsuffix clean,$(SUBDIRS))
 
-ifeq ($(MACHINE),)
-	MACHINE:= $(shell grep "^\s*#define MACHINE_" machine.h | sed "s/^\s*#define MACHINE_//")
-else
-	CC_FLAGS += -DMACHINE_$(MACHINE)
+MACHINES := $(sort $(patsubst boards/%/board.c,%,$(wildcard boards/*/board.c)))
+
+# Utility targets do not need a board selection.
+ifneq ($(filter-out clean distclean machine_check list-machines $(SUBDIRS) $(SUBDIRSCLEAN),$(or $(MAKECMDGOALS),all)),)
+ifeq ($(strip $(MACHINE)),)
+$(error Select a board with make MACHINE=<target>; see make list-machines)
+endif
+ifeq ($(filter $(MACHINE),$(MACHINES)),)
+$(error Unknown MACHINE '$(MACHINE)'; see make list-machines)
+endif
 endif
 
+BOARD_DIR := boards/$(MACHINE)
+BOARD_INIT := $(or $(wildcard $(BOARD_DIR)/init.c),machine_init.c)
 BUILDDIR = output/$(MACHINE)
 VERSION_HEADER := version.h
 
@@ -47,13 +55,10 @@ all: create_build_dir $(VERSION_HEADER) $(SUBDIRS) $(BUILDDIR)/rtlplayground-$(F
 
 create_build_dir:
 	mkdir -p "$(BUILDDIR)"
-	mkdir -p "$(BUILDDIR)/uip"
-	mkdir -p "$(BUILDDIR)/httpd"
 
-# Keep machine.c in first position to fail immediately on invalid $MACHINE value
 SRCS = \
-	machine.c \
-	machine_init.c \
+	$(BOARD_DIR)/board.c \
+	$(BOARD_INIT) \
 	cmd_editor.c \
 	cmd_parser.c \
 	dhcp.c \
@@ -125,6 +130,7 @@ $(SUBDIRSCLEAN):
 	$(MAKE) -C $(@:clean=) clean
 
 $(BUILDDIR)/%.rel: %.c | create_build_dir html_data.h
+	@mkdir -p "$(dir $@)"
 	$(CC) -MMD $(CC_FLAGS) -o $@ -c $<
 
 $(BUILDDIR)/%.rel: %.asm | create_build_dir
@@ -148,15 +154,20 @@ $(BUILDDIR)/rtlplayground-$(FILENAME_EXTENSION).bin: $(BUILDDIR)/rtlplayground.i
 
 .PHONY: clean distclean all $(SUBDIRS) $(SUBDIRSCLEAN) $(VERSION_HEADER) create_build_dir
 
-.PHONY:
+.PHONY: list-machines machine_check
+list-machines:
+	@printf '%s\n' $(MACHINES)
+
 machine_check:
 	@mkdir -p $(BUILDDIR)/tmp
-	@set -eo pipefail; \
-	for MACHINE in `grep -E '^[[:space:]]*(//[[:space:]]*)?#define MACHINE_' machine.h | sed -E 's%^[[:space:]]*(//[[:space:]]*)?#define MACHINE_%%' | awk '{print $$1}' | sort -u`; \
+	@set -e; \
+	for machine in $(MACHINES); \
 	do \
-	echo "Checking $${MACHINE}"; \
-	$(CC) $(CC_FLAGS) -DMACHINE_$${MACHINE} -MMD -o $(BUILDDIR)/tmp/machine_check -c machine.c; \
-	$(CC) $(CC_FLAGS) -DMACHINE_$${MACHINE} -MMD -o $(BUILDDIR)/tmp/machine_check -c machine_init.c; \
+	echo "Checking $${machine}"; \
+	init=boards/$${machine}/init.c; \
+	if [ ! -f "$$init" ]; then init=machine_init.c; fi; \
+	$(CC) $(CC_FLAGS) -o $(BUILDDIR)/tmp/board.rel -c boards/$${machine}/board.c; \
+	$(CC) $(CC_FLAGS) -o $(BUILDDIR)/tmp/init.rel -c "$$init"; \
 	done
 	@rm -rf $(BUILDDIR)/tmp
 
