@@ -75,6 +75,7 @@ jobs:
 
       - name: Build firmware and OEM installer
         run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           if [[ "$GITHUB_EVENT_NAME" == release ]]; then
             if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
               echo "::error::Release tags must use vX.Y.Z or vX.Y.Z-prerelease"
@@ -92,6 +93,8 @@ jobs:
           test -s installer/output/rtlplayground_oem_upgrade.bin
           tools/output/crc_calculator -v output/rtlplayground.bin
           firmware=$(basename "$(readlink output/rtlplayground.bin)")
+          commit=$(git rev-parse --short HEAD)
+          [[ "$firmware" == *-"$commit"-"$MACHINE".bin ]]
           mkdir -p dist
           cp output/rtlplayground.bin "dist/$firmware"
           cp installer/output/rtlplayground_oem_upgrade.bin "dist/${firmware%.bin}-oem-upgrade.bin"
